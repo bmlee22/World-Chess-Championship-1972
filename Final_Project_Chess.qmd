@@ -11,11 +11,14 @@ format:
 ## install.packages("lubridate")
 ## install.packages("tidyr")
 ## install.packages("dplyr")
+install.packages("janitor")
+install.packages("fuzzyjoin")
 library(readr)
 library(tidyverse)
 library(lubridate)
 library(tidyr)
 library(dplyr)
+library(rvest)
 ```
 
 ```{r}
@@ -23,7 +26,7 @@ fisher_spassky_data <- read_csv(here::here("data/WorldChamp1972.csv"))
 large_data <- read_csv(here::here("data/1.World_Chess_Champoinship_CSV.csv"))
 ```
 
-Clean up dataset
+Clean up data set
 ```{r}
 network_df <- large_data |>
   filter(Round == 1) |>
@@ -31,11 +34,55 @@ network_df <- large_data |>
   separate_wider_delim(Date, ".", names = c("Year", "na"),
                        too_many = "merge") |>
   select(-na) |>
+  mutate(Year = parse_number(Year)) |>
   arrange(desc(Year)) 
 
 ## look into champion titles
 ## change names to they are consistent
 ```
 
+Gather a new data set of only champions
+```{r}
+url <- "https://www.chess.com/article/view/world-chess-champions"
 
+h <- read_html(url)
+
+tab <- h %>% html_nodes("table")
+
+objs <- tab %>% html_table()
+
+Classical_WC <- objs[[1]]
+
+colnames(Classical_WC) <- Classical_WC[1, ]
+
+Classical_WC_Clean <- Classical_WC[-1, ]        
+```
+
+Clean the new data set and join with the old
+```{r}
+Classical_Clean <- Classical_WC_Clean |> separate_longer_delim(cols = "Years Won",
+                                            delim = ",") |>
+  mutate(Year = parse_number(`Years Won`)) |>
+  select(Player, Year)
+
+Joined_data <- left_join(Classical_Clean,
+          network_df,
+          by = "Year",
+          relationship = "many-to-many")
+
+Tidy_df <- Joined_data |>
+  slice(-c(19, 20, 31, 39, 45:49, 53, 57, 60, 61)) |>
+  separate_wider_delim(cols = White,
+                       delim = ",",
+                       names = c("Player1", "First_name1")) |>
+  separate_wider_delim(cols = Black,
+                       delim = ",",
+                       names = c("Player2", "First_name2"))
+
+```
+
+Network Plot
+```{r}
+
+```
 
